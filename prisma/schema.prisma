@@ -1,0 +1,141 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(cuid())
+  email        String   @unique
+  name         String?
+  phone        String?
+  passwordHash String?
+  bonusPoints  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  orders            Order[]
+  addresses         Address[]
+  bonusTransactions BonusTransaction[]
+}
+
+model OtpCode {
+  id        String   @id @default(cuid())
+  email     String
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+}
+
+model Category {
+  id        String     @id @default(cuid())
+  name      String
+  slug      String     @unique
+  sortOrder Int        @default(0)
+  menuItems MenuItem[]
+}
+
+model MenuItem {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  price       Int
+  image       String?
+  weight      Int?
+  volume      Int?
+  unit        String?
+  available   Boolean  @default(true)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  category   Category @relation(fields: [categoryId], references: [id])
+  categoryId String
+
+  orderItems OrderItem[]
+}
+
+model Order {
+  id          String      @id @default(cuid())
+  status      OrderStatus @default(PENDING)
+  type        OrderType
+  name        String
+  phone       String
+  address     String?
+  district    String?
+  pickupTime  String?
+  subtotal    Int
+  delivery    Int         @default(0)
+  total       Int
+  bonusUsed   Int         @default(0)
+  bonusEarned Int         @default(0)
+  note        String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user   User?   @relation(fields: [userId], references: [id])
+  userId String?
+
+  items            OrderItem[]
+  bonusTransaction BonusTransaction?
+}
+
+model OrderItem {
+  id       String @id @default(cuid())
+  name     String
+  price    Int
+  quantity Int
+
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  orderId    String
+  menuItem   MenuItem? @relation(fields: [menuItemId], references: [id])
+  menuItemId String?
+}
+
+model Address {
+  id        String   @id @default(cuid())
+  label     String?
+  value     String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId String
+}
+
+model BonusTransaction {
+  id        String              @id @default(cuid())
+  amount    Int
+  type      BonusTransactionType
+  note      String?
+  createdAt DateTime            @default(now())
+
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId  String
+  order   Order?  @relation(fields: [orderId], references: [id])
+  orderId String? @unique
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  COOKING
+  DELIVERING
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderType {
+  DELIVERY
+  PICKUP
+}
+
+enum BonusTransactionType {
+  EARN
+  SPEND
+}
