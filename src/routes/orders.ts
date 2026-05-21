@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth';
-import { sendMaxOrderMessage } from '../lib/max';
+import { sendMaxMessage, sendMaxOrderMessage } from '../lib/max';
 
 const router = Router();
 
@@ -132,7 +132,12 @@ ${itemsList}
 ID: #${order.id.slice(-6)}
 Время: ${new Date().toLocaleString('ru-RU')}`;
 
-    sendMaxOrderMessage(message, confirmUrl, rejectUrl).catch(() => {});
+    // Кнопки подтверждения только для авторизованных клиентов (есть userId)
+    if (req.user) {
+      sendMaxOrderMessage(message, confirmUrl, rejectUrl).catch(() => {});
+    } else {
+      sendMaxMessage(message).catch(() => {});
+    }
 
     res.status(201).json(order);
   } catch (e: any) {
