@@ -2,7 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth';
-import { sendMaxMessage, sendMaxOrderMessage } from '../lib/max';
+import { sendMaxMessage, sendMaxOrderMessage, removeMaxOrderButtons } from '../lib/max';
 
 const router = Router();
 
@@ -134,7 +134,14 @@ ID: #${order.id.slice(-6)}
 
     // Кнопки подтверждения только для авторизованных клиентов (есть userId)
     if (req.user) {
-      sendMaxOrderMessage(message, confirmUrl, rejectUrl).catch(() => {});
+      sendMaxOrderMessage(message, confirmUrl, rejectUrl)
+        .then(messageId => {
+          if (messageId) {
+            prisma.order.update({ where: { id: order.id }, data: { maxMessageId: messageId } })
+              .catch(e => console.error('[orders] save maxMessageId:', e));
+          }
+        })
+        .catch(() => {});
     } else {
       sendMaxMessage(message).catch(() => {});
     }
@@ -194,6 +201,10 @@ router.get('/:id/confirm-payment', async (req, res) => {
     }
   });
 
+  if (order.maxMessageId) {
+    removeMaxOrderButtons(order.maxMessageId, order.id, true).catch(() => {});
+  }
+
   const bonusMsg = order.userId && order.bonusEarned > 0
     ? `Клиенту начислено +${order.bonusEarned} бонусных баллов.`
     : 'Бонусы не предусмотрены (гость или нулевая сумма).';
@@ -240,6 +251,10 @@ router.get('/:id/reject-payment', async (req, res) => {
       });
     }
   });
+
+  if (order.maxMessageId) {
+    removeMaxOrderButtons(order.maxMessageId, order.id, false).catch(() => {});
+  }
 
   res.send(html('Заказ отменён', '❌', `Заказ #${order.id.slice(-6).toUpperCase()} отменён. ${order.bonusUsed > 0 ? `Возвращено ${order.bonusUsed} бонусов клиенту.` : ''}`));
 });

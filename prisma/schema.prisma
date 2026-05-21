@@ -80,6 +80,7 @@ model Order {
   bonusUsed     Int         @default(0)
   bonusEarned   Int         @default(0)
   bonusCredited Boolean     @default(false)
+  maxMessageId  String?
   note          String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
