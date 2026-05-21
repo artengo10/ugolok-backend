@@ -77,9 +77,10 @@ model Order {
   subtotal    Int
   delivery    Int         @default(0)
   total       Int
-  bonusUsed   Int         @default(0)
-  bonusEarned Int         @default(0)
-  note        String?
+  bonusUsed     Int         @default(0)
+  bonusEarned   Int         @default(0)
+  bonusCredited Boolean     @default(false)
+  note          String?
   createdAt   DateTime    @default(now())
   updatedAt   DateTime    @updatedAt
 

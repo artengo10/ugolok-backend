@@ -1,7 +1,7 @@
 const MAX_BOT_TOKEN = process.env.MAX_BOT_TOKEN;
 const MAX_CHAT_ID = process.env.MAX_CHAT_ID;
 
-export async function sendMaxMessage(text: string): Promise<void> {
+async function postToMax(body: object): Promise<void> {
   if (!MAX_BOT_TOKEN || !MAX_CHAT_ID) {
     console.warn('[Max] MAX_BOT_TOKEN or MAX_CHAT_ID not configured');
     return;
@@ -13,7 +13,7 @@ export async function sendMaxMessage(text: string): Promise<void> {
         'Authorization': MAX_BOT_TOKEN,
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ text }),
+      body: JSON.stringify(body),
     });
     if (!res.ok) {
       console.error('[Max] Error:', await res.text());
@@ -21,4 +21,27 @@ export async function sendMaxMessage(text: string): Promise<void> {
   } catch (e) {
     console.error('[Max] Network error:', e);
   }
+}
+
+export async function sendMaxMessage(text: string): Promise<void> {
+  return postToMax({ text });
+}
+
+export async function sendMaxOrderMessage(
+  text: string,
+  confirmUrl: string,
+  rejectUrl: string,
+): Promise<void> {
+  return postToMax({
+    text,
+    attachments: [{
+      type: 'inline_keyboard',
+      payload: {
+        buttons: [[
+          { type: 'link', text: '✅ Оплатил', url: confirmUrl },
+          { type: 'link', text: '❌ Не оплатил', url: rejectUrl },
+        ]],
+      },
+    }],
+  });
 }
