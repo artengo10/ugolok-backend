@@ -155,6 +155,82 @@ router.post('/login', async (req, res) => {
   }
 });
 
+// POST /auth/forgot-password — шаг 1: отправить OTP для сброса пароля
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = z.object({ email: z.string().email('Некорректный email') }).parse(req.body);
+
+    // Всегда возвращаем 200 — не раскрываем существует ли email
+    const user = await prisma.user.findUnique({ where: { email } });
+    if (user?.passwordHash) {
+      const code = generateOtp();
+      const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
+      await prisma.otpCode.create({ data: { email, code, type: 'RESET', expiresAt } });
+
+      resend.emails.send({
+        from: 'Уголок вкуса <noreply@ugolok-vkusa1.ru>',
+        to: email,
+        subject: 'Сброс пароля — Уголок вкуса',
+        html: `
+          <div style="font-family:sans-serif;max-width:400px;margin:0 auto;padding:24px">
+            <h2 style="margin:0 0 16px">Уголок вкуса</h2>
+            <p style="color:#555;margin:0 0 8px">Вы запросили сброс пароля.</p>
+            <p style="color:#555;margin:0 0 24px">Введите этот код для создания нового пароля:</p>
+            <div style="background:#f5f0eb;border-radius:12px;padding:20px;text-align:center">
+              <span style="font-size:36px;font-weight:700;letter-spacing:8px;color:#1a1a1a">${code}</span>
+            </div>
+            <p style="color:#888;font-size:13px;margin:16px 0 0">Код действует 10 минут. Если вы не запрашивали сброс пароля — проигнорируйте это письмо.</p>
+          </div>
+        `,
+      }).catch((e: any) => console.error('[forgot-password resend]', e));
+    }
+
+    res.json({ ok: true });
+  } catch (e: any) {
+    if (e.name === 'ZodError') {
+      res.status(400).json({ error: e.errors[0]?.message ?? 'Некорректный email' });
+    } else {
+      console.error('[forgot-password error]', e);
+      res.status(500).json({ error: 'Ошибка сервера' });
+    }
+  }
+});
+
+// POST /auth/reset-password — шаг 2: подтвердить OTP и установить новый пароль
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, code, newPassword } = z.object({
+      email: z.string().email(),
+      code: z.string().length(6),
+      newPassword: z.string().min(6, 'Минимум 6 символов'),
+    }).parse(req.body);
+
+    const otp = await prisma.otpCode.findFirst({
+      where: { email, code, type: 'RESET', used: false, expiresAt: { gt: new Date() } },
+      orderBy: { createdAt: 'desc' },
+    });
+
+    if (!otp) {
+      res.status(400).json({ error: 'Неверный или истёкший код' });
+      return;
+    }
+
+    await prisma.otpCode.update({ where: { id: otp.id }, data: { used: true } });
+
+    const passwordHash = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({ where: { email }, data: { passwordHash } });
+
+    res.json({ ok: true });
+  } catch (e: any) {
+    if (e.name === 'ZodError') {
+      res.status(400).json({ error: e.errors[0]?.message ?? 'Некорректные данные' });
+    } else {
+      console.error('[reset-password error]', e);
+      res.status(500).json({ error: 'Ошибка сервера' });
+    }
+  }
+});
+
 // POST /auth/send-otp — оставлен для обратной совместимости
 router.post('/send-otp', async (req, res) => {
   try {
