@@ -50,8 +50,8 @@ router.post('/', optionalAuth, async (req: AuthRequest, res) => {
     }
 
     const total = subtotal + delivery - bonusUsed;
-    // bonusEarned рассчитывается здесь, но начисляется ТОЛЬКО после подтверждения оплаты
-    const bonusEarned = req.user ? Math.floor(total * BONUS_EARN_RATE) : 0;
+    // Если бонусы списывались — начисление не происходит (либо копишь, либо тратишь)
+    const bonusEarned = req.user && bonusUsed === 0 ? Math.floor(total * BONUS_EARN_RATE) : 0;
 
     const order = await prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
@@ -132,19 +132,15 @@ ${itemsList}
 ID: #${order.id.slice(-6)}
 Время: ${new Date().toLocaleString('ru-RU')}`;
 
-    // Кнопки подтверждения только для авторизованных клиентов (есть userId)
-    if (req.user) {
-      sendMaxOrderMessage(message, confirmUrl, rejectUrl)
-        .then(messageId => {
-          if (messageId) {
-            prisma.order.update({ where: { id: order.id }, data: { maxMessageId: messageId } })
-              .catch(e => console.error('[orders] save maxMessageId:', e));
-          }
-        })
-        .catch(() => {});
-    } else {
-      sendMaxMessage(message).catch(() => {});
-    }
+    // Кнопки подтверждения для всех заказов
+    sendMaxOrderMessage(message, confirmUrl, rejectUrl)
+      .then(messageId => {
+        if (messageId) {
+          prisma.order.update({ where: { id: order.id }, data: { maxMessageId: messageId } })
+            .catch(e => console.error('[orders] save maxMessageId:', e));
+        }
+      })
+      .catch(() => {});
 
     res.status(201).json(order);
   } catch (e: any) {
