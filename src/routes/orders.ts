@@ -10,9 +10,9 @@ const BONUS_EARN_RATE = 0.05;
 const BONUS_SPEND_MAX = 0.30;
 
 const orderItemSchema = z.object({
-  id: z.string(),
+  id: z.union([z.string(), z.number()]).transform(String),
   name: z.string(),
-  price: z.number().int().positive(),
+  price: z.number().positive(),
   quantity: z.number().int().positive(),
 });
 
@@ -69,9 +69,8 @@ router.post('/', optionalAuth, async (req: AuthRequest, res) => {
           items: {
             create: data.items.map((i) => ({
               name: i.name,
-              price: i.price,
+              price: Math.round(i.price),
               quantity: i.quantity,
-              menuItemId: i.id,
             })),
           },
         },
