@@ -19,7 +19,7 @@ async function postToMax(body: object): Promise<string | null> {
       console.error('[Max] Error:', await res.text());
       return null;
     }
-    const data = await res.json();
+    const data = await res.json() as any;
     // Пробуем разные форматы ответа MAX API
     const messageId = data?.message?.id ?? data?.message_id ?? data?.id ?? null;
     if (messageId) console.log('[Max] message_id:', messageId);
