@@ -51,7 +51,7 @@ router.post('/addresses', async (req: AuthRequest, res) => {
 
 // DELETE /profile/addresses/:id
 router.delete('/addresses/:id', async (req: AuthRequest, res) => {
-  await prisma.address.deleteMany({ where: { id: req.params.id, userId: req.user!.userId } });
+  await prisma.address.deleteMany({ where: { id: String(req.params.id), userId: req.user!.userId } });
   res.json({ ok: true });
 });
 

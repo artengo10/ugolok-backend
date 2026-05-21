@@ -165,7 +165,7 @@ router.get('/', requireAuth, async (req: AuthRequest, res) => {
 // GET /orders/:id
 router.get('/:id', requireAuth, async (req: AuthRequest, res) => {
   const order = await prisma.order.findFirst({
-    where: { id: req.params.id, userId: req.user!.userId },
+    where: { id: String(req.params.id), userId: req.user!.userId },
     include: { items: true },
   });
   if (!order) { res.status(404).json({ error: 'Not found' }); return; }
