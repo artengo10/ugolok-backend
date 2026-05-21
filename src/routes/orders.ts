@@ -7,6 +7,7 @@ import { sendMaxMessage, sendMaxOrderMessage, removeMaxOrderButtons } from '../l
 const router = Router();
 
 const BONUS_EARN_RATE = 0.05;
+const BONUS_SPEND_MAX = 0.30;
 
 const SITE_URL = 'https://ugolok-vkusa1.ru';
 
@@ -44,8 +45,8 @@ router.post('/', optionalAuth, async (req: AuthRequest, res) => {
     if (req.user && data.bonusToSpend > 0) {
       const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
       if (!user) { res.status(404).json({ error: 'User not found' }); return; }
-      // Можно потратить все накопленные бонусы, но не больше суммы заказа
-      bonusUsed = Math.min(data.bonusToSpend, user.bonusPoints, subtotal);
+      const maxSpend = Math.floor(subtotal * BONUS_SPEND_MAX);
+      bonusUsed = Math.min(data.bonusToSpend, user.bonusPoints, maxSpend);
     }
 
     const total = subtotal + delivery - bonusUsed;
