@@ -36,7 +36,7 @@ router.post('/register', async (req, res) => {
     const { name, email, password } = z.object({
       name: z.string().min(2, 'Минимум 2 символа'),
       email: z.string().email('Некорректный email'),
-      password: z.string().min(8, 'Минимум 8 символов'),
+      password: z.string().min(6, 'Минимум 6 символов'),
     }).parse(req.body);
 
     const existing = await prisma.user.findUnique({ where: { email } });
