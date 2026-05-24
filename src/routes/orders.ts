@@ -14,7 +14,7 @@ const SITE_URL = 'https://ugolok-vkusa1.ru';
 const orderItemSchema = z.object({
   id: z.union([z.string(), z.number()]).transform(String),
   name: z.string(),
-  price: z.number().positive(),
+  price: z.number().min(0),
   quantity: z.number().int().positive(),
 });
 
