@@ -28,6 +28,13 @@ router.put('/', async (req: AuthRequest, res) => {
   res.json(user);
 });
 
+// PUT /profile/push-token
+router.put('/push-token', async (req: AuthRequest, res) => {
+  const { token } = z.object({ token: z.string() }).parse(req.body);
+  await prisma.user.update({ where: { id: req.user!.userId }, data: { pushToken: token } });
+  res.json({ ok: true });
+});
+
 // GET /profile/addresses
 router.get('/addresses', async (req: AuthRequest, res) => {
   const addresses = await prisma.address.findMany({

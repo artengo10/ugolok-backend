@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { prisma } from '../lib/prisma';
 import { requireAuth, optionalAuth, AuthRequest } from '../middleware/auth';
 import { sendMaxMessage, sendMaxOrderMessage, removeMaxOrderButtons } from '../lib/max';
+import { sendPushNotification } from '../lib/push';
 
 const router = Router();
 
@@ -201,6 +202,17 @@ router.get('/:id/confirm-payment', async (req, res) => {
     removeMaxOrderButtons(order.maxMessageId, order.id, true).catch(() => {});
   }
 
+  // Пуш-уведомление клиенту
+  if (order.userId) {
+    const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { pushToken: true } });
+    if (user?.pushToken) {
+      const body = order.bonusEarned > 0
+        ? `Заказ #${order.id.slice(-6).toUpperCase()} оплачен. Начислено +${order.bonusEarned} бонусных баллов 🎁`
+        : `Заказ #${order.id.slice(-6).toUpperCase()} подтверждён. Спасибо!`;
+      sendPushNotification(user.pushToken, '✅ Оплата подтверждена', body).catch(() => {});
+    }
+  }
+
   const bonusMsg = order.userId && order.bonusEarned > 0
     ? `Клиенту начислено +${order.bonusEarned} бонусных баллов.`
     : 'Бонусы не предусмотрены (гость или нулевая сумма).';
@@ -250,6 +262,17 @@ router.get('/:id/reject-payment', async (req, res) => {
 
   if (order.maxMessageId) {
     removeMaxOrderButtons(order.maxMessageId, order.id, false).catch(() => {});
+  }
+
+  // Пуш-уведомление клиенту
+  if (order.userId) {
+    const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { pushToken: true } });
+    if (user?.pushToken) {
+      const body = order.bonusUsed > 0
+        ? `Заказ #${order.id.slice(-6).toUpperCase()} отменён. ${order.bonusUsed} баллов возвращено.`
+        : `Заказ #${order.id.slice(-6).toUpperCase()} отменён.`;
+      sendPushNotification(user.pushToken, '❌ Заказ отменён', body).catch(() => {});
+    }
   }
 
   res.send(html('Заказ отменён', '❌', `Заказ #${order.id.slice(-6).toUpperCase()} отменён. ${order.bonusUsed > 0 ? `Возвращено ${order.bonusUsed} бонусов клиенту.` : ''}`));
