@@ -32,6 +32,7 @@ const createOrderSchema = z.object({
   prepayment: z.number().int().min(0).optional().default(0),
   source: z.enum(['website', 'app']).optional().default('website'),
   note: z.string().optional(),
+  pushToken: z.string().optional(),
 });
 
 // POST /orders — создать заказ (auth optional)
@@ -69,6 +70,7 @@ router.post('/', optionalAuth, async (req: AuthRequest, res) => {
           total,
           bonusUsed,
           bonusEarned,
+          pushToken: data.pushToken ?? null,
           userId: req.user?.userId ?? null,
           items: {
             create: data.items.map((i) => ({
@@ -203,14 +205,14 @@ router.get('/:id/confirm-payment', async (req, res) => {
   }
 
   // Пуш-уведомление клиенту
-  if (order.userId) {
-    const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { pushToken: true } });
-    if (user?.pushToken) {
-      const body = order.bonusEarned > 0
-        ? `Заказ #${order.id.slice(-6).toUpperCase()} оплачен. Начислено +${order.bonusEarned} бонусных баллов 🎁`
-        : `Заказ #${order.id.slice(-6).toUpperCase()} подтверждён. Спасибо!`;
-      sendPushNotification(user.pushToken, '✅ Оплата подтверждена', body).catch(() => {});
-    }
+  const confirmPushToken = order.userId
+    ? (await prisma.user.findUnique({ where: { id: order.userId }, select: { pushToken: true } }))?.pushToken
+    : order.pushToken;
+  if (confirmPushToken) {
+    const body = order.bonusEarned > 0
+      ? `Заказ #${order.id.slice(-6).toUpperCase()} оплачен. Начислено +${order.bonusEarned} бонусных баллов 🎁`
+      : `Заказ #${order.id.slice(-6).toUpperCase()} подтверждён. Спасибо!`;
+    sendPushNotification(confirmPushToken, '✅ Оплата подтверждена', body).catch(() => {});
   }
 
   const bonusMsg = order.userId && order.bonusEarned > 0
@@ -265,14 +267,14 @@ router.get('/:id/reject-payment', async (req, res) => {
   }
 
   // Пуш-уведомление клиенту
-  if (order.userId) {
-    const user = await prisma.user.findUnique({ where: { id: order.userId }, select: { pushToken: true } });
-    if (user?.pushToken) {
-      const body = order.bonusUsed > 0
-        ? `Заказ #${order.id.slice(-6).toUpperCase()} отменён. ${order.bonusUsed} баллов возвращено.`
-        : `Заказ #${order.id.slice(-6).toUpperCase()} отменён.`;
-      sendPushNotification(user.pushToken, '❌ Заказ отменён', body).catch(() => {});
-    }
+  const rejectPushToken = order.userId
+    ? (await prisma.user.findUnique({ where: { id: order.userId }, select: { pushToken: true } }))?.pushToken
+    : order.pushToken;
+  if (rejectPushToken) {
+    const body = order.bonusUsed > 0
+      ? `Заказ #${order.id.slice(-6).toUpperCase()} отменён. ${order.bonusUsed} баллов возвращено.`
+      : `Заказ #${order.id.slice(-6).toUpperCase()} отменён.`;
+    sendPushNotification(rejectPushToken, '❌ Заказ отменён', body).catch(() => {});
   }
 
   res.send(html('Заказ отменён', '❌', `Заказ #${order.id.slice(-6).toUpperCase()} отменён. ${order.bonusUsed > 0 ? `Возвращено ${order.bonusUsed} бонусов клиенту.` : ''}`));
