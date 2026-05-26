@@ -62,4 +62,14 @@ router.delete('/addresses/:id', async (req: AuthRequest, res) => {
   res.json({ ok: true });
 });
 
+// DELETE /profile — удаление аккаунта
+router.delete('/', async (req: AuthRequest, res) => {
+  const userId = req.user!.userId;
+  // Отвязываем заказы (сохраняем историю для бизнеса)
+  await prisma.order.updateMany({ where: { userId }, data: { userId: null } });
+  // Удаляем пользователя (cascade: адреса, бонусные транзакции)
+  await prisma.user.delete({ where: { id: userId } });
+  res.json({ ok: true });
+});
+
 export default router;
