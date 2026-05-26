@@ -105,10 +105,23 @@ router.post('/verify-registration', async (req, res) => {
       return;
     }
 
+    // +50 бонусов за регистрацию (один раз)
+    const hasRegistrationBonus = await prisma.bonusTransaction.findFirst({
+      where: { userId: user.id, note: 'registration' },
+    });
+    let bonusPoints = user.bonusPoints;
+    if (!hasRegistrationBonus) {
+      const [updated] = await prisma.$transaction([
+        prisma.user.update({ where: { id: user.id }, data: { bonusPoints: { increment: 50 } } }),
+        prisma.bonusTransaction.create({ data: { userId: user.id, amount: 50, type: 'EARN', note: 'registration' } }),
+      ]);
+      bonusPoints = updated.bonusPoints;
+    }
+
     const token = signToken({ userId: user.id, email: user.email });
     res.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name, bonusPoints: user.bonusPoints },
+      user: { id: user.id, email: user.email, name: user.name, bonusPoints },
     });
   } catch (e: any) {
     if (e.name === 'ZodError') {
@@ -300,10 +313,23 @@ router.post('/verify-otp', async (req, res) => {
       create: { email, name: name ?? null },
     });
 
+    // +50 бонусов за регистрацию (один раз)
+    const hasRegistrationBonus = await prisma.bonusTransaction.findFirst({
+      where: { userId: user.id, note: 'registration' },
+    });
+    let bonusPoints = user.bonusPoints;
+    if (!hasRegistrationBonus) {
+      const [updated] = await prisma.$transaction([
+        prisma.user.update({ where: { id: user.id }, data: { bonusPoints: { increment: 50 } } }),
+        prisma.bonusTransaction.create({ data: { userId: user.id, amount: 50, type: 'EARN', note: 'registration' } }),
+      ]);
+      bonusPoints = updated.bonusPoints;
+    }
+
     const token = signToken({ userId: user.id, email: user.email });
     res.json({
       token,
-      user: { id: user.id, email: user.email, name: user.name, bonusPoints: user.bonusPoints },
+      user: { id: user.id, email: user.email, name: user.name, bonusPoints },
     });
   } catch (e: any) {
     if (e.name === 'ZodError') {
