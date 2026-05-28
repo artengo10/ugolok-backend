@@ -43,17 +43,24 @@ router.post('/', optionalAuth, async (req: AuthRequest, res) => {
     const subtotal = data.items.reduce((sum, i) => sum + i.price * i.quantity, 0);
     const delivery = data.delivery;
 
+    // Проверяем существование юзера — токен может быть от удалённого аккаунта
+    let verifiedUserId: string | null = null;
+    if (req.user?.userId) {
+      const exists = await prisma.user.findUnique({ where: { id: req.user.userId }, select: { id: true } });
+      verifiedUserId = exists?.id ?? null;
+    }
+
     let bonusUsed = 0;
-    if (req.user && data.bonusToSpend > 0) {
-      const user = await prisma.user.findUnique({ where: { id: req.user.userId } });
-      if (!user) { res.status(404).json({ error: 'User not found' }); return; }
-      const maxSpend = Math.floor(subtotal * BONUS_SPEND_MAX);
-      bonusUsed = Math.min(data.bonusToSpend, user.bonusPoints, maxSpend);
+    if (verifiedUserId && data.bonusToSpend > 0) {
+      const user = await prisma.user.findUnique({ where: { id: verifiedUserId } });
+      if (user) {
+        const maxSpend = Math.floor(subtotal * BONUS_SPEND_MAX);
+        bonusUsed = Math.min(data.bonusToSpend, user.bonusPoints, maxSpend);
+      }
     }
 
     const total = subtotal + delivery - bonusUsed;
-    // Если бонусы списывались — начисление не происходит (либо копишь, либо тратишь)
-    const bonusEarned = req.user && bonusUsed === 0 ? Math.floor(total * BONUS_EARN_RATE) : 0;
+    const bonusEarned = verifiedUserId && bonusUsed === 0 ? Math.floor(total * BONUS_EARN_RATE) : 0;
 
     const order = await prisma.$transaction(async (tx) => {
       const created = await tx.order.create({
@@ -71,7 +78,7 @@ router.post('/', optionalAuth, async (req: AuthRequest, res) => {
           bonusUsed,
           bonusEarned,
           pushToken: data.pushToken ?? null,
-          userId: req.user?.userId ?? null,
+          userId: verifiedUserId,
           items: {
             create: data.items.map((i) => ({
               name: i.name,
@@ -84,14 +91,14 @@ router.post('/', optionalAuth, async (req: AuthRequest, res) => {
       });
 
       // Только списание бонусов происходит сразу; начисление — после подтверждения
-      if (req.user && bonusUsed > 0) {
+      if (verifiedUserId && bonusUsed > 0) {
         await tx.user.update({
-          where: { id: req.user.userId },
+          where: { id: verifiedUserId! },
           data: { bonusPoints: { decrement: bonusUsed } },
         });
         await tx.bonusTransaction.create({
           data: {
-            userId: req.user.userId,
+            userId: verifiedUserId,
             amount: -bonusUsed,
             type: 'SPEND',
             note: `Списание за заказ #${created.id.slice(-6)}`,
